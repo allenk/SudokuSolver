@@ -1,0 +1,16 @@
+{
+  "name": "sudoku-solver",
+  "version": "1.0.0",
+  "description": "High-performance Sudoku solver with OCR support",
+  "homepage": "https://github.com/yourusername/sudoku-solver",
+  "license": "MIT",
+  "supports": "windows & x64",
+  "dependencies": [
+    "opencv4",
+    "tesseract",
+    "leptonica",
+    "nlohmann-json",
+    "cli11"
+  ],
+  "builtin-baseline": "7e19f3c64cb636ee21f41bfe8558a6dfaae6236f"
+}
