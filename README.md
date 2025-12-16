@@ -132,7 +132,7 @@ Where:
 
 ### 🖥️ Cross-Platform Benchmark (GitHub CI Runners)
 
-**Test Configuration:** 9x9 Puzzle, 400 total solves, Algorithm Comparison
+**Test Configuration:** ./SudokuSolver -b 100 -w 0 -a compare -t 25
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -172,7 +172,7 @@ Throughput Comparison (GitHub Runners)
 
 ### 🏠 Local Machine Benchmark
 
-**Test Configuration:** 9x9 Puzzle, 3200 total solves
+**Test Configuration:** ./SudokuSolver -b 100 -w 0 -a compare -t 25
 
 #### High-End Desktop: AMD Ryzen 9 9950X3D
 
@@ -235,6 +235,7 @@ BT = Backtracking, DLX = Dancing Links
 #### Mobile SoC: Qualcomm Snapdragon 8 Gen 3
 
 ```
+./SudokuSolver -b 100 -w 0 -a compare -t 25
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │     Snapdragon 8 Gen 3 (Cortex-X4 + A720 + A520) - 12GB LPDDR5              │
 ├─────────────┬─────────────┬───────────────┬──────────┬──────────────────────┤
@@ -569,3 +570,5 @@ MIT License
 ## Related
 
 - [Sudoku Solver — From a Father-Son Coding Challenge to a CPU Benchmark Tool](https://allenkuo.medium.com/sudoku-solver-from-a-father-son-coding-challenge-to-a-cpu-benchmark-tool-38300c968bf5)
+- [Sudoku Solver — Cross-Platform Performance Deep Dive (Part II)](https://allenkuo.medium.com/sudoku-solver-cross-platform-performance-deep-dive-part-ii-7dd1fc60e8b1)
+
