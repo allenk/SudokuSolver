@@ -30,6 +30,12 @@
 #include <sys/system_properties.h>
 #endif
 
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#include <mach/mach.h>
+#include <mach/mach_host.h>
+#endif
+
 namespace sudoku {
 
 // Helper method implementations
@@ -404,7 +410,15 @@ static std::string getSocName(const std::string& model) {
 
     return model;  // Return original if unknown
 }
-#endif
+
+static std::string getAndroidProp(const char* name) {
+    char value[PROP_VALUE_MAX] = {0};
+    if (__system_property_get(name, value) > 0) {
+        return std::string(value);
+    }
+    return "";
+}
+#endif // __ANDROID__
 
 // ============================================================================
 // ARM CPU Part ID Lookup
@@ -488,19 +502,53 @@ static std::string getArmCpuName(uint32_t implementer, uint32_t part) {
 }
 
 // ============================================================================
-// Get Android property helper
+// macOS sysctl helper
 // ============================================================================
-#ifdef __ANDROID__
-static std::string getAndroidProp(const char* name) {
-    char value[PROP_VALUE_MAX] = {0};
-    if (__system_property_get(name, value) > 0) {
-        return std::string(value);
+#ifdef __APPLE__
+static std::string getSysctlString(const char* name) {
+    size_t size = 0;
+    if (sysctlbyname(name, nullptr, &size, nullptr, 0) != 0) return "";
+
+    std::string result(size, '\0');
+    if (sysctlbyname(name, &result[0], &size, nullptr, 0) != 0) return "";
+
+    // Remove trailing null
+    while (!result.empty() && result.back() == '\0') {
+        result.pop_back();
     }
-    return "";
+    return result;
+}
+
+static int64_t getSysctlInt64(const char* name) {
+    int64_t value = 0;
+    size_t size = sizeof(value);
+    if (sysctlbyname(name, &value, &size, nullptr, 0) != 0) return 0;
+    return value;
+}
+
+static int getSysctlInt(const char* name) {
+    int value = 0;
+    size_t size = sizeof(value);
+    if (sysctlbyname(name, &value, &size, nullptr, 0) != 0) return 0;
+    return value;
 }
 #endif
 
 std::string SystemInfoDetector::detectCpuModel() {
+#ifdef __APPLE__
+    // macOS: use sysctl
+    std::string brand = getSysctlString("machdep.cpu.brand_string");
+    if (!brand.empty()) {
+        return brand;
+    }
+    // Fallback for Apple Silicon
+    std::string chip = getSysctlString("machdep.cpu.brand");
+    if (!chip.empty()) {
+        return chip;
+    }
+    // Last resort
+    return "Apple Silicon";
+#else
     std::string socName;
 
 #ifdef __ANDROID__
@@ -623,9 +671,13 @@ std::string SystemInfoDetector::detectCpuModel() {
     }
 
     return "Unknown CPU";
+#endif // !__APPLE__
 }
 
 int SystemInfoDetector::detectPhysicalCores() {
+#ifdef __APPLE__
+    return getSysctlInt("hw.physicalcpu");
+#else
     std::ifstream cpuinfo("/proc/cpuinfo");
     std::string line;
     int cores = 0;
@@ -656,13 +708,28 @@ int SystemInfoDetector::detectPhysicalCores() {
     }
 
     return std::max(1, cores);
+#endif
 }
 
 int SystemInfoDetector::detectLogicalCores() {
+#ifdef __APPLE__
+    return getSysctlInt("hw.logicalcpu");
+#else
     return static_cast<int>(sysconf(_SC_NPROCESSORS_ONLN));
+#endif
 }
 
 double SystemInfoDetector::detectBaseClock() {
+#ifdef __APPLE__
+    // macOS: get CPU frequency (in Hz, convert to MHz)
+    int64_t freq = getSysctlInt64("hw.cpufrequency");
+    if (freq > 0) {
+        return static_cast<double>(freq) / 1000000.0;
+    }
+    // Apple Silicon doesn't report frequency via sysctl
+    // Return 0 and let cpuClockFormatted handle it
+    return 0.0;
+#else
     // Try cpufreq (works on Android and modern Linux)
     std::ifstream curFreq("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq");
     if (curFreq.is_open()) {
@@ -698,9 +765,18 @@ double SystemInfoDetector::detectBaseClock() {
     }
 
     return 0.0;
+#endif
 }
 
 double SystemInfoDetector::detectMaxClock() {
+#ifdef __APPLE__
+    // macOS: try to get max frequency
+    int64_t freq = getSysctlInt64("hw.cpufrequency_max");
+    if (freq > 0) {
+        return static_cast<double>(freq) / 1000000.0;
+    }
+    return detectBaseClock();
+#else
     // For big.LITTLE, find the highest frequency across all CPUs
     double maxMhz = 0.0;
     for (int i = 0; i < 16; ++i) {
@@ -725,7 +801,9 @@ double SystemInfoDetector::detectMaxClock() {
             return khz / 1000.0;
         }
     }
+
     return detectBaseClock();
+#endif
 }
 
 std::string SystemInfoDetector::detectCpuArchitecture() {
@@ -743,6 +821,9 @@ std::string SystemInfoDetector::detectCpuArchitecture() {
 }
 
 uint64_t SystemInfoDetector::detectTotalRam() {
+#ifdef __APPLE__
+    return static_cast<uint64_t>(getSysctlInt64("hw.memsize"));
+#else
     std::ifstream meminfo("/proc/meminfo");
     std::string line;
 
@@ -751,14 +832,30 @@ uint64_t SystemInfoDetector::detectTotalRam() {
             std::regex re("\\d+");
             std::smatch match;
             if (std::regex_search(line, match, re)) {
-                return std::stoull(match.str()) * 1024;  // KB to bytes
+                return std::stoull(match.str()) * 1024;
             }
         }
     }
     return 0;
+#endif
 }
 
 uint64_t SystemInfoDetector::detectAvailableRam() {
+#ifdef __APPLE__
+    // Use mach API to get free memory
+    mach_port_t host = mach_host_self();
+    vm_statistics64_data_t vmStats;
+    mach_msg_type_number_t count = HOST_VM_INFO64_COUNT;
+
+    if (host_statistics64(host, HOST_VM_INFO64,
+                          reinterpret_cast<host_info64_t>(&vmStats),
+                          &count) == KERN_SUCCESS) {
+        // Free + inactive pages (similar to "available" on Linux)
+        uint64_t pageSize = static_cast<uint64_t>(getSysctlInt("hw.pagesize"));
+        return (vmStats.free_count + vmStats.inactive_count) * pageSize;
+    }
+    return 0;
+#else
     std::ifstream meminfo("/proc/meminfo");
     std::string line;
 
@@ -767,16 +864,19 @@ uint64_t SystemInfoDetector::detectAvailableRam() {
             std::regex re("\\d+");
             std::smatch match;
             if (std::regex_search(line, match, re)) {
-                return std::stoull(match.str()) * 1024;  // KB to bytes
+                return std::stoull(match.str()) * 1024;
             }
         }
     }
     return 0;
+#endif
 }
 
 std::string SystemInfoDetector::detectOsName() {
 #ifdef __ANDROID__
     return "Android";
+#elif defined(__APPLE__)
+    return "macOS";
 #else
     // Try to read from os-release
     std::ifstream osRelease("/etc/os-release");
@@ -809,13 +909,43 @@ std::string SystemInfoDetector::detectOsVersion() {
         }
         return version;
     }
-#endif
+    return "Unknown";
+#elif defined(__APPLE__)
+    // Get macOS version from sysctl
+    std::string version = getSysctlString("kern.osproductversion");
+    if (!version.empty()) {
+        // Map major version to macOS name
+        int major = 0;
+        try {
+            major = std::stoi(version.substr(0, version.find('.')));
+        } catch (...) {
+            major = 0;
+        }
 
+        std::string codename;
+        switch (major) {
+            case 15: codename = "Sequoia"; break;
+            case 14: codename = "Sonoma"; break;
+            case 13: codename = "Ventura"; break;
+            case 12: codename = "Monterey"; break;
+            case 11: codename = "Big Sur"; break;
+            case 10: codename = "Catalina"; break;
+            default: break;
+        }
+
+        if (!codename.empty()) {
+            return version + " (" + codename + ")";
+        }
+        return version;
+    }
+    return "Unknown";
+#else
     struct utsname info;
     if (uname(&info) == 0) {
         return info.release;
     }
     return "Unknown";
+#endif
 }
 
 std::string SystemInfoDetector::detectOsArchitecture() {
