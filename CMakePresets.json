@@ -1,0 +1,193 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "vcpkg-base",
+      "hidden": true,
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+    },
+
+    {
+      "name": "windows-base",
+      "hidden": true,
+      "inherits": ["base", "vcpkg-base"],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded"
+      },
+      "generator": "Ninja"
+    },
+    {
+      "name": "windows-x64-Debug",
+      "displayName": "Windows x64 Debug",
+      "inherits": "windows-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreadedDebug"
+      }
+    },
+    {
+      "name": "windows-x64-Release",
+      "displayName": "Windows x64 Release",
+      "inherits": "windows-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+
+
+    {
+      "name": "linux-base",
+      "hidden": true,
+      "inherits": ["base", "vcpkg-base"],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-linux"
+      },
+      "generator": "Ninja"
+    },
+    {
+      "name": "linux-x64-Debug",
+      "displayName": "Linux x64 Debug",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "linux-x64-Release",
+      "displayName": "Linux x64 Release",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+
+    {
+      "name": "mac-base",
+      "hidden": true,
+      "inherits": ["base", "vcpkg-base"],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
+        "CMAKE_OSX_ARCHITECTURES": "x86_64;arm64"
+      },
+      "generator": "Ninja"
+    },
+    {
+      "name": "mac-universal-Debug",
+      "displayName": "macOS Universal Debug",
+      "inherits": "mac-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "mac-universal-Release",
+      "displayName": "macOS Universal Release",
+      "inherits": "mac-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+
+    {
+      "name": "android-base",
+      "hidden": true,
+      "inherits": [ "base", "vcpkg-base"],
+      "environment": {
+      },
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "arm64-android",
+        "ANDROID_PLATFORM": "android-29",
+        "CMAKE_ANDROID_API": "29",
+        "ANDROID_STL": "c++_static",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake"
+      },
+      "generator": "Ninja"
+    },
+    {
+      "name": "android-arm64-Debug",
+      "displayName": "Android ARM64 Debug",
+      "inherits": "android-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ANDROID_ABI": "arm64-v8a"
+      }
+    },
+    {
+      "name": "android-arm64-Release",
+      "displayName": "Android ARM64 Release",
+      "inherits": "android-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "ANDROID_ABI": "arm64-v8a"
+      }
+    }
+  ],
+
+  "buildPresets": [
+    {
+      "name": "windows-x64-Debug",
+      "configurePreset": "windows-x64-Debug"
+    },
+    {
+      "name": "windows-x64-Release",
+      "configurePreset": "windows-x64-Release"
+    },
+
+    {
+      "name": "linux-x64-Debug",
+      "configurePreset": "linux-x64-Debug"
+    },
+    {
+      "name": "linux-x64-Release",
+      "configurePreset": "linux-x64-Release"
+    },
+
+    {
+      "name": "mac-universal-Debug",
+      "configurePreset": "mac-universal-Debug"
+    },
+    {
+      "name": "mac-universal-Release",
+      "configurePreset": "mac-universal-Release"
+    },
+
+    {
+      "name": "android-arm64-Debug",
+      "configurePreset": "android-arm64-Debug"
+    },
+    {
+      "name": "android-arm64-Release",
+      "configurePreset": "android-arm64-Release"
+    }
+  ]
+}

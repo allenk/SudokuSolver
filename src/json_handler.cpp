@@ -51,7 +51,7 @@ Board JSONHandler::loadFromJSON(const nlohmann::json& json) {
             } else if (gridData[0].is_number()) {
                 // Single row? Or flat array
                 // Check if it could be a flat array
-                int totalSize = gridData.size();
+                int totalSize = static_cast<int>(gridData.size());
                 int possibleSize = static_cast<int>(std::sqrt(totalSize));
                 if (possibleSize * possibleSize == totalSize) {
                     // Flat array
@@ -103,7 +103,7 @@ Board JSONHandler::loadFromJSON(const nlohmann::json& json) {
 
 Grid JSONHandler::parseGrid2D(const nlohmann::json& arr, int& detectedSize) {
     Grid grid;
-    detectedSize = arr.size();
+    detectedSize = static_cast<int>(arr.size());
 
     for (const auto& row : arr) {
         std::vector<Cell> gridRow;
@@ -127,7 +127,7 @@ Grid JSONHandler::parseGrid2D(const nlohmann::json& arr, int& detectedSize) {
 
 Grid JSONHandler::parseGridStrings(const nlohmann::json& arr, int& detectedSize) {
     Grid grid;
-    detectedSize = arr.size();
+    detectedSize = static_cast<int>(arr.size());
 
     for (const auto& row : arr) {
         std::string rowStr = row.get<std::string>();
@@ -164,10 +164,10 @@ Grid JSONHandler::parseSingleString(const std::string& str, int& detectedSize) {
     }
 
     // Detect size from length
-    int len = cleaned.length();
-    detectedSize = static_cast<int>(std::sqrt(len));
+    size_t len = cleaned.length();
+    detectedSize = static_cast<int>(std::sqrt(static_cast<double>(len)));
 
-    if (detectedSize * detectedSize != len) {
+    if (static_cast<size_t>(detectedSize * detectedSize) != len) {
         throw std::runtime_error("Invalid puzzle string length: " + std::to_string(len));
     }
 
@@ -175,7 +175,7 @@ Grid JSONHandler::parseSingleString(const std::string& str, int& detectedSize) {
 
     for (int i = 0; i < detectedSize; ++i) {
         for (int j = 0; j < detectedSize; ++j) {
-            char c = cleaned[i * detectedSize + j];
+            char c = cleaned[static_cast<size_t>(i * detectedSize + j)];
             if (c >= '1' && c <= '9') {
                 grid[i][j] = c - '0';
             } else if (c >= 'A' && c <= 'Z') {
@@ -257,9 +257,9 @@ nlohmann::json JSONHandler::toJSON(const Board& board) {
             if (val == 0) {
                 row += '.';
             } else if (val < 10) {
-                row += ('0' + val);
+                row += static_cast<char>('0' + val);
             } else {
-                row += ('A' + val - 10);
+                row += static_cast<char>('A' + val - 10);
             }
         }
         rows.push_back(row);

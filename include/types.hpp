@@ -5,6 +5,7 @@
 #include <bitset>
 #include <array>
 #include <string>
+#include <cmath>
 #include <chrono>
 #include <optional>
 #include <memory>

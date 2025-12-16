@@ -206,6 +206,8 @@ void Benchmark::printComparison(
 
 // Worker task for multi-threaded benchmark
 BenchmarkResult Benchmark::workerTask(const Board& puzzle, SolverAlgorithm algo, int workerId) {
+    (void)workerId;
+
     // Each worker creates its own solver (solvers are not thread-safe)
     auto solver = SolverFactory::create(algo);
 

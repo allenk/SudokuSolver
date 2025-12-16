@@ -6,7 +6,11 @@
   "license": "MIT",
   "supports": "windows & x64",
   "dependencies": [
-    "opencv4",
+    {
+      "name": "opencv4",
+      "default-features": false,
+      "features": [ "jpeg", "png", "webp" ]
+    },
     "tesseract",
     "leptonica",
     "nlohmann-json",

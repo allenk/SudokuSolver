@@ -1,0 +1,193 @@
+# =============================================================================
+# Sudoku Solver - Cross-Platform CI
+# =============================================================================
+name: Build
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  # ===========================================================================
+  # Windows Build
+  # ===========================================================================
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: '594ad8871e1e8e45f8e626c015fd611163430207'
+
+    - name: Configure & Build
+      run: |
+        cmake --preset windows-x64-Release
+        cmake --build --preset windows-x64-Release
+
+    - name: Test binary
+      run: ./out/build/windows-x64-Release/SudokuSolver.exe -b 100 -w 0 -a compare -t 25
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SudokuSolver-Windows-x64
+        path: out/build/windows-x64-Release/SudokuSolver.exe
+
+  # ===========================================================================
+  # Linux Build
+  # ===========================================================================
+  build-linux:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: '594ad8871e1e8e45f8e626c015fd611163430207'
+
+    - name: Configure & Build
+      run: |
+        cmake --preset linux-x64-Release
+        cmake --build --preset linux-x64-Release
+
+    - name: Test binary
+      run: ./out/build/linux-x64-Release/SudokuSolver -b 100 -w 0 -a compare -t 25
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SudokuSolver-Linux-x64
+        path: out/build/linux-x64-Release/SudokuSolver
+
+  # ===========================================================================
+  # macOS Build (Universal Binary)
+  # ===========================================================================
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: brew list ninja || brew install ninja
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: '594ad8871e1e8e45f8e626c015fd611163430207'
+
+    - name: Build x64
+      run: |
+        cmake -B build-x64 -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+          -DVCPKG_TARGET_TRIPLET=x64-osx \
+          -DCMAKE_OSX_ARCHITECTURES=x86_64
+        cmake --build build-x64
+
+    - name: Build arm64
+      run: |
+        cmake -B build-arm64 -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+          -DVCPKG_TARGET_TRIPLET=arm64-osx \
+          -DCMAKE_OSX_ARCHITECTURES=arm64
+        cmake --build build-arm64
+
+    - name: Create Universal Binary
+      run: |
+        lipo -create build-x64/SudokuSolver build-arm64/SudokuSolver -output SudokuSolver
+        strip SudokuSolver
+
+    - name: Test binary
+      run: ./SudokuSolver -b 100 -w 0 -a compare -t 25
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SudokuSolver-macOS-Universal
+        path: SudokuSolver
+
+  # ===========================================================================
+  # Release (on tag push)
+  # ===========================================================================
+  release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Fetch tags
+      run: git fetch --tags --force
+
+    - name: Get tag message
+      id: tag
+      run: |
+        TAG_NAME=${GITHUB_REF#refs/tags/}
+        echo "Tag name: $TAG_NAME"
+        TAG_MESSAGE=$(git for-each-ref --format='%(contents)' refs/tags/$TAG_NAME)
+        echo "message<<EOF" >> $GITHUB_OUTPUT
+        echo "$TAG_MESSAGE" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: List downloaded files
+      run: find . -type f
+
+    - name: Prepare release files
+      run: |
+        # Windows
+        cp SudokuSolver-Windows-x64/SudokuSolver.exe ./SudokuSolver.exe
+        zip SudokuSolver-Windows-x64.zip SudokuSolver.exe
+        rm SudokuSolver.exe
+
+        # Linux
+        cp SudokuSolver-Linux-x64/SudokuSolver ./SudokuSolver
+        chmod +x SudokuSolver
+        zip SudokuSolver-Linux-x64.zip SudokuSolver
+        rm SudokuSolver
+
+        # macOS
+        cp SudokuSolver-macOS-Universal/SudokuSolver ./SudokuSolver
+        chmod +x SudokuSolver
+        zip SudokuSolver-macOS-Universal.zip SudokuSolver
+        rm SudokuSolver
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        body: ${{ steps.tag.outputs.message }}
+        files: |
+          SudokuSolver-Windows-x64.zip
+          SudokuSolver-Linux-x64.zip
+          SudokuSolver-macOS-Universal.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -20,11 +20,11 @@ Board::Board(const Grid& grid) {
     if (grid.empty() || grid[0].empty()) {
         throw std::invalid_argument("Empty grid");
     }
-    int size = static_cast<int>(grid.size());
+    auto size = grid.size();
     if (grid[0].size() != size) {
         throw std::invalid_argument("Grid must be square");
     }
-    dim_ = BoardDimension::FromSize(size);
+    dim_ = BoardDimension::FromSize(static_cast<int>(size));
     grid_ = grid;
 }
 
@@ -32,7 +32,8 @@ Board::Board(const Grid& grid, const BoardDimension& dim) : dim_(dim) {
     if (!dim_.isValid()) {
         throw std::invalid_argument("Invalid board dimension");
     }
-    if (grid.size() != dim_.size || grid[0].size() != dim_.size) {
+    if (grid.size() != static_cast<std::size_t>(dim_.size) ||
+        grid[0].size() != static_cast<std::size_t>(dim_.size)) {
         throw std::invalid_argument("Grid size doesn't match dimension");
     }
     grid_ = grid;
@@ -351,7 +352,7 @@ int Board::difficulty() const {
             if (grid_[i][j] == 0) {
                 auto candidates = getCandidates(i, j);
                 if (candidates.size() <= 2) {
-                    difficultCells += 3 - candidates.size();
+                    difficultCells += 3 - static_cast<int>(candidates.size());
                 }
             }
         }
